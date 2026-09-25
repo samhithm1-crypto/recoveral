@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: recoverai
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false   # You will paste your key in Render dashboard
+    plan: free

@@ -1,0 +1,43 @@
+# ── Secrets ──────────────────────────────────────────────────────────────────
+.env
+*.env
+.env.*
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+
+# ── Uploads & demo data ──────────────────────────────────────────────────────
+uploads/
+demo_files/
+raw_data/
+reports/
+*.jpg
+*.jpeg
+*.png
+*.bin
+*.img
+*.iso
+
+# ── Checkpoints (large rollback snapshots) ───────────────────────────────────
+checkpoint_v3/
+checkpoint_v4/
+
+# ── OS files ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
