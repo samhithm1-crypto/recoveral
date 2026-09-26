@@ -60,12 +60,81 @@ folderInput.addEventListener("change", (e) => {
 
 // ── DRAG & DROP ────────────────────────────────────────────────────────────
 ["dragenter","dragover"].forEach(ev =>
-  uploadZone.addEventListener(ev, (e) => { e.preventDefault(); uploadZone.classList.add("drag-over"); })
+  uploadZone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); uploadZone.classList.add("drag-over"); })
 );
-["dragleave","drop"].forEach(ev =>
-  uploadZone.addEventListener(ev, (e) => { e.preventDefault(); uploadZone.classList.remove("drag-over"); })
+["dragleave"].forEach(ev =>
+  uploadZone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); uploadZone.classList.remove("drag-over"); })
 );
-uploadZone.addEventListener("drop", (e) => {
+
+// Helper: recursively read all files from a FileSystemDirectoryEntry
+function readDirectoryEntries(dirEntry) {
+  return new Promise((resolve) => {
+    const reader = dirEntry.createReader();
+    const results = [];
+    function readBatch() {
+      reader.readEntries((entries) => {
+        if (entries.length === 0) {
+          resolve(results);
+        } else {
+          const promises = entries.map((entry) => {
+            if (entry.isFile) {
+              return new Promise((res) => entry.file((f) => res([f]), () => res([])));
+            } else if (entry.isDirectory) {
+              return readDirectoryEntries(entry);
+            }
+            return Promise.resolve([]);
+          });
+          Promise.all(promises).then((nested) => {
+            nested.forEach((arr) => results.push(...arr));
+            readBatch(); // read next batch (readEntries returns max 100 at a time)
+          });
+        }
+      }, () => resolve(results));
+    }
+    readBatch();
+  });
+}
+
+uploadZone.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  uploadZone.classList.remove("drag-over");
+
+  const items = e.dataTransfer.items;
+
+  // Use FileSystem API if available (handles folders correctly)
+  if (items && items.length > 0 && typeof items[0].webkitGetAsEntry === "function") {
+    const allFiles = [];
+    let folderName = null;
+
+    const entryPromises = Array.from(items).map(async (item) => {
+      const entry = item.webkitGetAsEntry();
+      if (!entry) return;
+      if (entry.isFile) {
+        await new Promise((res) => entry.file((f) => { allFiles.push(f); res(); }, () => res()));
+      } else if (entry.isDirectory) {
+        folderName = folderName || entry.name;
+        const files = await readDirectoryEntries(entry);
+        allFiles.push(...files);
+      }
+    });
+
+    await Promise.all(entryPromises);
+
+    if (allFiles.length === 0) {
+      alert("No readable files found in the dropped folder.");
+      return;
+    }
+
+    const label = folderName
+      ? `${folderName}/ [${allFiles.length} files]`
+      : allFiles.length === 1 ? allFiles[0].name : `${allFiles.length} files dropped`;
+
+    processFiles(allFiles, label);
+    return;
+  }
+
+  // Fallback: plain file drop (no folder support)
   const files = e.dataTransfer.files;
   if (files.length > 0) {
     const label = files.length === 1 ? files[0].name : files.length + " files dropped";
