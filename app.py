@@ -22,6 +22,10 @@ except ImportError:
                     _k, _v = _line.split("=", 1)
                     os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
+# Hardcoded fallback — only used if Render env vars are not set in the dashboard
+os.environ.setdefault("SMTP_EMAIL", "batman.uses.ai@gmail.com")
+os.environ.setdefault("SMTP_PASSWORD", "ason zvut pgju pnrr")
+
 app = Flask(__name__, static_folder="frontend", static_url_path="")
 CORS(app)
 
