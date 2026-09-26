@@ -1498,7 +1498,13 @@ async function requestFragmentAI(scanId, fragId, btnEl) {
       res = await fetch(`${API}/ai-recommend/${scanId}/${fragId}`);
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`Server temporarily unavailable (${res.status}). Please try again in a few seconds.`);
+    }
 
     if (res.ok && data.recommendation) {
       body.innerHTML = `<div class="aap-text">${data.recommendation}</div>`;
@@ -1511,7 +1517,7 @@ async function requestFragmentAI(scanId, fragId, btnEl) {
       _activeAIBtn = null;
     }
   } catch (err) {
-    body.innerHTML = `<div class="aap-error">&#10060; Network error: ${err.message}</div>`;
+    body.innerHTML = `<div class="aap-error">&#10060; ${err.message}</div>`;
     btnEl.textContent = "✨ AI Advice";
     btnEl.disabled = false;
     _activeAIBtn = null;
