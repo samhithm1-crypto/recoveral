@@ -7,6 +7,21 @@ from fragment_reconstructor import reconstruct_from_fragments
 import ai_engine
 import deleted_recovery
 
+# Load .env file into os.environ so SMTP_EMAIL / SMTP_PASSWORD / GEMINI_API_KEY are available
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=False)
+except ImportError:
+    # Fallback: parse .env manually
+    _env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(_env_path):
+        with open(_env_path) as _ef:
+            for _line in _ef:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 app = Flask(__name__, static_folder="frontend", static_url_path="")
 CORS(app)
 
