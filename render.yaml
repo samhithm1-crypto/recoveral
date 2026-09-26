@@ -6,9 +6,9 @@ services:
     startCommand: gunicorn app:app
     envVars:
       - key: GEMINI_API_KEY
-        sync: false   # Paste your key in Render dashboard
+        sync: false
       - key: SMTP_EMAIL
         value: batman.uses.ai@gmail.com
       - key: SMTP_PASSWORD
-        sync: false   # Paste your App Password in Render dashboard
+        value: "ason zvut pgju pnrr"
     plan: free
