@@ -835,6 +835,256 @@ function exportPDF() {
   }
 }
 
+// ── Email Report Modal ──────────────────────────────────────────────────────
+function showEmailReportModal() {
+  if (!currentReport) { showToast("Run a scan first before emailing a report.", true); return; }
+
+  const old = document.getElementById("emailReportModal");
+  if (old) old.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "emailReportModal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:2000;background:rgba(10,0,0,0.82);
+    backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;
+    animation:fadeUp 0.3s ease;
+  `;
+  modal.innerHTML = `
+    <div style="
+      background:rgba(22,4,6,0.97);border:1px solid rgba(255,138,101,0.4);
+      border-radius:18px;padding:28px 32px;width:min(460px,92vw);
+      box-shadow:0 20px 64px rgba(0,0,0,0.85);
+    ">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <span style="font-size:28px;">📧</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#FFF0F0;">Email Forensic Report</div>
+          <div style="font-size:11px;color:#C8A0A0;margin-top:2px;">Send the full PDF report to your email</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,138,101,0.07);border:1px solid rgba(255,138,101,0.2);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#C8A0A0;line-height:1.6;">
+        📎 <strong style="color:#FF8A65;">Includes:</strong> Full PDF forensic report (fragment map, integrity scores,
+        categories, relationships, AI analysis) for scan <strong style="color:#FFF0F0;">${currentReport.scan_id}</strong>
+      </div>
+
+      <label style="font-size:12px;color:#C8A0A0;font-weight:600;display:block;margin-bottom:6px;">📬 Recipient Email</label>
+      <input id="emailReportInput" type="email" placeholder="Enter email address"
+        style="
+          width:100%;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,138,101,0.3);
+          background:rgba(255,255,255,0.05);color:#FFF0F0;font-size:13px;
+          font-family:inherit;outline:none;margin-bottom:16px;transition:border-color 0.2s;
+        "
+        onfocus="this.style.borderColor='rgba(255,138,101,0.8)'"
+        onblur="this.style.borderColor='rgba(255,138,101,0.3)'"
+      />
+      <div style="display:flex;gap:10px;">
+        <button id="sendReportBtn" onclick="emailReport()"
+          style="
+            flex:1;padding:11px;border-radius:10px;border:none;
+            background:linear-gradient(135deg,#CC0018,#FF8A65);
+            color:#fff;font-weight:700;font-size:13px;cursor:pointer;transition:opacity 0.2s;
+          "
+          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
+        >📨 Generate PDF &amp; Send</button>
+        <button onclick="document.getElementById('emailReportModal').remove();"
+          style="
+            padding:11px 20px;border-radius:10px;border:1px solid rgba(255,138,101,0.25);
+            background:transparent;color:#C8A0A0;font-weight:600;font-size:13px;cursor:pointer;
+          "
+        >Cancel</button>
+      </div>
+      <div id="emailReportStatus" style="margin-top:12px;font-size:12px;text-align:center;min-height:18px;"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+  setTimeout(() => document.getElementById("emailReportInput")?.focus(), 100);
+}
+
+async function emailReport() {
+  if (!currentReport) return;
+
+  const emailInput = document.getElementById("emailReportInput");
+  const status     = document.getElementById("emailReportStatus");
+  const sendBtn    = document.getElementById("sendReportBtn");
+  const email      = emailInput?.value?.trim();
+
+  if (!email || !email.includes("@")) {
+    if (emailInput) emailInput.style.borderColor = "rgba(255,23,68,0.9)";
+    if (status) status.innerHTML = `<span style="color:#FF1744;">⚠ Enter a valid email address</span>`;
+    return;
+  }
+
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "⏳ Generating PDF..."; }
+  if (status)  status.innerHTML = `<span style="color:#C8A0A0;">Building forensic report PDF...</span>`;
+
+  try {
+    // ── Generate PDF exactly like exportPDF() but return base64 ─────────────
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const W   = doc.internal.pageSize.getWidth();
+    const { meta, summary, fragments, relationships } = currentReport;
+
+    const C = {
+      bg:[7,9,15], panel:[13,17,27], cyan:[6,182,212], blue:[59,130,246],
+      green:[34,197,94], yellow:[245,158,11], red:[239,68,68],
+      purple:[168,85,247], white:[226,232,240], gray:[100,116,139],
+    };
+    function fillBg() { doc.setFillColor(...C.bg); doc.rect(0,0,W,297,"F"); }
+    fillBg();
+
+    doc.setFillColor(...C.panel); doc.rect(0,0,W,38,"F");
+    doc.setFillColor(...C.cyan);  doc.rect(0,0,W,2,"F");
+    doc.setTextColor(...C.cyan); doc.setFont("helvetica","bold"); doc.setFontSize(22);
+    doc.text("RecoverAI",15,16);
+    doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.setTextColor(...C.gray);
+    doc.text("FORENSIC EDITION  |  AI-Powered Data Recovery Platform",15,22);
+    doc.setFillColor(...C.cyan); doc.roundedRect(W-55,8,45,10,2,2,"F");
+    doc.setTextColor(...C.bg); doc.setFont("helvetica","bold"); doc.setFontSize(8);
+    doc.text(`SCAN: ${currentReport.scan_id}`,W-32.5,14.5,{align:"center"});
+    doc.setTextColor(...C.gray); doc.setFont("helvetica","normal"); doc.setFontSize(8);
+    doc.text(`Target: ${meta.filename}   |   Size: ${meta.filesize_kb} KB   |   Scanned: ${new Date(meta.scan_time).toLocaleString()}`,15,32);
+
+    let y = 48;
+    const cards = [
+      {label:"Total Fragments",val:summary.total_fragments,   color:C.blue},
+      {label:"Recoverable",    val:summary.recoverable,        color:C.green},
+      {label:"Partial",        val:summary.partial,            color:C.yellow},
+      {label:"Critical",       val:summary.critical,           color:C.red},
+      {label:"Recovery Rate",  val:summary.recovery_rate_pct+"%",color:C.purple},
+    ];
+    const cw = (W-30)/5;
+    cards.forEach((c,i)=>{
+      const cx=15+i*cw;
+      doc.setFillColor(...C.panel); doc.roundedRect(cx,y,cw-3,20,2,2,"F");
+      doc.setFillColor(...c.color); doc.roundedRect(cx,y,cw-3,2,1,1,"F");
+      doc.setTextColor(...c.color); doc.setFont("helvetica","bold"); doc.setFontSize(14);
+      doc.text(String(c.val),cx+(cw-3)/2,y+11,{align:"center"});
+      doc.setTextColor(...C.gray); doc.setFont("helvetica","normal"); doc.setFontSize(6.5);
+      doc.text(c.label.toUpperCase(),cx+(cw-3)/2,y+17,{align:"center"});
+    });
+    y += 28;
+
+    function sectionHeader(title,yPos){
+      doc.setFillColor(...C.panel); doc.rect(15,yPos,W-30,8,"F");
+      doc.setFillColor(...C.cyan);  doc.rect(15,yPos,3,8,"F");
+      doc.setTextColor(...C.white); doc.setFont("helvetica","bold"); doc.setFontSize(9);
+      doc.text(title,22,yPos+5.5);
+      return yPos+12;
+    }
+    const statusColor=(s)=>s==="RECOVERABLE"?[34,197,94]:s==="PARTIAL"?[245,158,11]:[239,68,68];
+
+    y = sectionHeader("FRAGMENT RECOVERY MAP",y);
+    doc.autoTable({
+      startY:y, margin:{left:15,right:15},
+      head:[["Priority","Fragment","Type","Size","Integrity","Status","SHA-256"]],
+      body:fragments.map(f=>[f.priority,f.name,f.type_name,f.size_kb+" KB",f.integrity.score+"%",f.integrity.status,f.sha256+"…"]),
+      styles:{fontSize:7.5,fillColor:C.panel,textColor:C.white,lineColor:[30,40,60],lineWidth:0.1,cellPadding:2.5},
+      headStyles:{fillColor:[20,28,48],textColor:C.cyan,fontStyle:"bold",fontSize:7},
+      columnStyles:{0:{halign:"center",cellWidth:16},3:{halign:"right",cellWidth:18},4:{halign:"center",cellWidth:18},5:{halign:"center",cellWidth:24},6:{cellWidth:28,fontSize:6.5}},
+      didParseCell(data){
+        if(data.section==="body"&&data.column.index===5){data.cell.styles.textColor=statusColor(data.cell.raw);data.cell.styles.fontStyle="bold";}
+        if(data.section==="body"&&data.column.index===4){const sc=parseFloat(data.cell.raw);data.cell.styles.textColor=sc>=75?C.green:sc>=45?C.yellow:C.red;data.cell.styles.fontStyle="bold";}
+      },
+      alternateRowStyles:{fillColor:[10,14,22]},
+    });
+    y = doc.lastAutoTable.finalY+10;
+
+    if(y>230){doc.addPage();fillBg();y=20;}
+    y = sectionHeader("DATA CATEGORIES DETECTED",y);
+    const catEntries=Object.entries(summary.categories_found);
+    const colW=(W-30)/Math.min(catEntries.length,4);
+    catEntries.forEach(([cat,count],i)=>{
+      if(i>0&&i%4===0){y+=16;}
+      const cx=15+(i%4)*colW;
+      doc.setFillColor(...C.panel);doc.roundedRect(cx,y,colW-4,12,2,2,"F");
+      doc.setTextColor(...C.cyan);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(String(count),cx+6,y+8);
+      doc.setTextColor(...C.gray);doc.setFont("helvetica","normal");doc.setFontSize(7);doc.text(cat.toUpperCase(),cx+14,y+8);
+    });
+    y+=20;
+
+    if(relationships&&relationships.length>0){
+      if(y>230){doc.addPage();fillBg();y=20;}
+      y=sectionHeader("FRAGMENT RELATIONSHIPS",y);
+      doc.autoTable({
+        startY:y,margin:{left:15,right:15},
+        head:[["From","To","Reason","Confidence"]],
+        body:relationships.map(r=>{const fn=fragments.find(f=>f.id===r.from)?.name||`FRAG_${r.from}`;const tn=fragments.find(f=>f.id===r.to)?.name||`FRAG_${r.to}`;return[fn,tn,r.reason,r.confidence+"%"];}),
+        styles:{fontSize:7.5,fillColor:C.panel,textColor:C.white,lineColor:[30,40,60],lineWidth:0.1,cellPadding:2.5},
+        headStyles:{fillColor:[20,28,48],textColor:C.cyan,fontStyle:"bold",fontSize:7},
+        alternateRowStyles:{fillColor:[10,14,22]},
+      });
+      y=doc.lastAutoTable.finalY+10;
+    }
+
+    if(y>220){doc.addPage();fillBg();y=20;}
+    y=sectionHeader("AI ANALYSIS SUMMARY",y);
+    const rate=summary.recovery_rate_pct;
+    const cats=Object.keys(summary.categories_found).join(", ");
+    const rVerb=rate>=70?"HIGH confidence recovery":rate>=40?"MODERATE partial recovery":"LOW — significant data loss";
+    const aiText=[
+      `Scan Target: ${meta.filename} (${meta.filesize_kb} KB)`,"",
+      `RecoverAI identified ${summary.total_fragments} data segments using magic byte analysis and Shannon entropy scoring.`,
+      `${summary.recoverable} fragments are fully recoverable, ${summary.partial} are partially intact,`,
+      `and ${summary.critical} show critical corruption levels and are likely unrecoverable.`,"",
+      `Overall Recovery Assessment: ${rVerb} — estimated ${rate}% of original data can be restored.`,
+      `Categories detected: ${cats}.`,
+      summary.top_priority_fragment?`Highest-priority fragment: ${summary.top_priority_fragment}`:"","",
+      `Generated by RecoverAI v1.0 | Evidence integrity via SHA-256 | ${new Date(meta.scan_time).toLocaleString()}`,
+    ].filter(l=>l!==null);
+    doc.setFillColor(...C.panel);
+    const tbH=aiText.length*5+10;
+    doc.roundedRect(15,y,W-30,tbH,3,3,"F");
+    doc.setFillColor(...C.purple);doc.roundedRect(15,y,3,tbH,1,1,"F");
+    doc.setFont("helvetica","normal");doc.setFontSize(8);
+    aiText.forEach((line,i)=>{
+      if(line==="")return;
+      if(i===0||i===6){doc.setTextColor(...C.white);doc.setFont("helvetica","bold");}
+      else if(i===aiText.length-1){doc.setTextColor(...C.gray);doc.setFont("helvetica","italic");}
+      else{doc.setTextColor(...C.white);doc.setFont("helvetica","normal");}
+      doc.text(line,22,y+7+i*5);
+    });
+
+    const totalPages=doc.internal.getNumberOfPages();
+    for(let p=1;p<=totalPages;p++){
+      doc.setPage(p);
+      doc.setFillColor(...C.panel);doc.rect(0,287,W,10,"F");
+      doc.setFillColor(...C.cyan);doc.rect(0,287,W,0.5,"F");
+      doc.setTextColor(...C.gray);doc.setFont("helvetica","normal");doc.setFontSize(7);
+      doc.text(`RecoverAI v1.0  ·  CalmStacks Hackathon 2026  ·  MCE Hassan  ·  Scan ID: ${currentReport.scan_id}`,15,293);
+      doc.text(`Page ${p} of ${totalPages}`,W-15,293,{align:"right"});
+    }
+
+    // ── Convert to base64 and send to backend ────────────────────────────────
+    const pdfBase64  = doc.output("datauristring").split(",")[1];
+    const filename   = `RecoverAI_Forensic_Report_${currentReport.scan_id}.pdf`;
+
+    if (sendBtn) sendBtn.textContent = "📤 Sending...";
+    if (status)  status.innerHTML = `<span style="color:#C8A0A0;">⏳ Sending email with PDF attachment...</span>`;
+
+    const res  = await fetch(`${API}/email-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, pdf_base64: pdfBase64, filename, scan_id: currentReport.scan_id })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      if (status) status.innerHTML = `<span style="color:#00F5A0;">✅ Report sent to ${data.sent_to}</span>`;
+      if (sendBtn) { sendBtn.textContent = "✔ Sent!"; }
+      setTimeout(() => document.getElementById("emailReportModal")?.remove(), 2500);
+    } else {
+      if (status) status.innerHTML = `<span style="color:#FF1744;">❌ ${data.error}</span>`;
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "📨 Generate PDF & Send"; }
+    }
+  } catch(err) {
+    if (status) status.innerHTML = `<span style="color:#FF1744;">❌ Error: ${err.message}</span>`;
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "📨 Generate PDF & Send"; }
+    console.error(err);
+  }
+}
+
 // ── RESET ──────────────────────────────────────────────────────────────────
 function resetScan() {
   currentReport   = null;
