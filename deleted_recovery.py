@@ -193,8 +193,30 @@ def scan_recycle_bin() -> list:
 def restore_from_recycle_bin(r_path: str, destination: str) -> dict:
     """
     Restore a file from Recycle Bin $R file to destination path.
+    If destination is empty, restores to Desktop/RecoverAI_Restored/.
     """
     try:
+        import pathlib
+        if not r_path or not os.path.exists(r_path):
+            return {"success": False, "error": f"Source file not found: {r_path}"}
+
+        # Auto-destination: Desktop/RecoverAI_Restored/
+        if not destination:
+            desktop = pathlib.Path.home() / "Desktop" / "RecoverAI_Restored"
+            desktop.mkdir(parents=True, exist_ok=True)
+            filename = os.path.basename(r_path)
+            destination = str(desktop / filename)
+
+        # Avoid overwriting existing files
+        dest_path = pathlib.Path(destination)
+        if dest_path.exists():
+            stem, suffix = dest_path.stem, dest_path.suffix
+            i = 1
+            while dest_path.exists():
+                dest_path = dest_path.parent / f"{stem}_{i}{suffix}"
+                i += 1
+            destination = str(dest_path)
+
         os.makedirs(os.path.dirname(destination), exist_ok=True)
         shutil.copy2(r_path, destination)
         return {"success": True, "restored_to": destination}

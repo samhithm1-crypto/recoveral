@@ -1748,14 +1748,119 @@ async function restoreFile(rPath, name, id) {
     });
     const data = await res.json();
     if (data.success) {
-      if (btn) { btn.className = "btn-restore done"; btn.textContent = "Restored!"; }
-      alert("File restored to:\n" + data.restored_to);
+      if (btn) { btn.className = "btn-restore done"; btn.textContent = "✔ Restored!"; }
+      showEmailModal(data.restored_to, name);
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = "Restore"; }
-      alert("Restore failed: " + data.error);
+      if (btn) { btn.disabled = false; btn.textContent = "⟳ Restore"; }
+      showToast("Restore failed: " + data.error, true);
     }
   } catch(e) {
-    if (btn) { btn.disabled = false; btn.textContent = "Restore"; }
+    if (btn) { btn.disabled = false; btn.textContent = "⟳ Restore"; }
+    showToast("Network error: " + e.message, true);
+  }
+}
+
+// ── Email modal after restore ────────────────────────────────────────────────
+function showEmailModal(restoredPath, filename) {
+  // Remove any existing
+  const old = document.getElementById("emailRestoreModal");
+  if (old) old.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "emailRestoreModal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:2000;background:rgba(10,0,0,0.82);
+    backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;
+    animation:fadeUp 0.3s ease;
+  `;
+  modal.innerHTML = `
+    <div style="
+      background:rgba(22,4,6,0.97);border:1px solid rgba(255,60,60,0.35);
+      border-radius:18px;padding:28px 32px;width:min(440px,92vw);
+      box-shadow:0 20px 64px rgba(0,0,0,0.85);
+    ">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+        <span style="font-size:24px;">✅</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#FFF0F0;">File Restored!</div>
+          <div style="font-size:11px;color:#C8A0A0;margin-top:2px;word-break:break-all;">${filename}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#6B3A3A;margin-bottom:18px;padding:8px 10px;background:rgba(255,60,60,0.07);border-radius:8px;font-family:monospace;">
+        📁 ${restoredPath}
+      </div>
+      <div style="font-size:13px;color:#C8A0A0;margin-bottom:12px;font-weight:600;">
+        📧 Send restored file to email?
+      </div>
+      <input id="emailRestoreInput" type="email" placeholder="Enter your email address"
+        style="
+          width:100%;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,60,60,0.3);
+          background:rgba(255,255,255,0.05);color:#FFF0F0;font-size:13px;
+          font-family:inherit;outline:none;margin-bottom:14px;
+          transition:border-color 0.2s;
+        "
+        onfocus="this.style.borderColor='rgba(255,60,60,0.7)'"
+        onblur="this.style.borderColor='rgba(255,60,60,0.3)'"
+      />
+      <div style="display:flex;gap:10px;">
+        <button onclick="sendRestoredByEmail('${restoredPath.replace(/\\/g,"\\\\").replace(/'/g,"\\'")}','${filename.replace(/'/g,"\\'")}');"
+          style="
+            flex:1;padding:10px;border-radius:10px;border:none;
+            background:linear-gradient(135deg,#CC0018,#FF3A3A);
+            color:#fff;font-weight:700;font-size:13px;cursor:pointer;
+            transition:opacity 0.2s;
+          "
+          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
+          id="sendEmailBtn"
+        >📨 Send Email</button>
+        <button onclick="document.getElementById('emailRestoreModal').remove();"
+          style="
+            padding:10px 20px;border-radius:10px;border:1px solid rgba(255,60,60,0.25);
+            background:transparent;color:#C8A0A0;font-weight:600;font-size:13px;cursor:pointer;
+          "
+        >Skip</button>
+      </div>
+      <div id="emailRestoreStatus" style="margin-top:10px;font-size:12px;text-align:center;"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+  setTimeout(() => document.getElementById("emailRestoreInput")?.focus(), 100);
+}
+
+async function sendRestoredByEmail(filePath, filename) {
+  const emailInput = document.getElementById("emailRestoreInput");
+  const status     = document.getElementById("emailRestoreStatus");
+  const sendBtn    = document.getElementById("sendEmailBtn");
+  const email      = emailInput?.value?.trim();
+
+  if (!email || !email.includes("@")) {
+    if (emailInput) emailInput.style.borderColor = "rgba(255,23,68,0.9)";
+    if (status) status.innerHTML = `<span style="color:#FF1744;">⚠ Enter a valid email address</span>`;
+    return;
+  }
+
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Sending..."; }
+  if (status)  status.innerHTML = `<span style="color:#C8A0A0;">⏳ Sending email...</span>`;
+
+  try {
+    const res  = await fetch(`${API}/deleted/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, file_path: filePath, filename })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (status) status.innerHTML = `<span style="color:#00F5A0;">✅ Email sent to ${data.sent_to}</span>`;
+      if (sendBtn) { sendBtn.textContent = "✔ Sent!"; }
+      setTimeout(() => document.getElementById("emailRestoreModal")?.remove(), 2500);
+    } else {
+      if (status) status.innerHTML = `<span style="color:#FF1744;">❌ ${data.error}</span>`;
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "📨 Send Email"; }
+    }
+  } catch(e) {
+    if (status) status.innerHTML = `<span style="color:#FF1744;">❌ Network error: ${e.message}</span>`;
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "📨 Send Email"; }
   }
 }
 

@@ -452,6 +452,67 @@ def deleted_restore():
     return jsonify(result)
 
 
+@app.route("/api/deleted/send-email", methods=["POST"])
+def deleted_send_email():
+    """Email a restored file as an attachment to the given address."""
+    import smtplib, pathlib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email.mime.text import MIMEText
+    from email import encoders
+
+    data       = request.get_json() or {}
+    to_email   = data.get("email", "").strip()
+    file_path  = data.get("file_path", "").strip()
+    filename   = data.get("filename", pathlib.Path(file_path).name if file_path else "recovered_file")
+
+    if not to_email:
+        return jsonify({"success": False, "error": "No email address provided"})
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"success": False, "error": f"File not found: {file_path}"})
+
+    smtp_email = os.environ.get("SMTP_EMAIL", "")
+    smtp_pass  = os.environ.get("SMTP_PASSWORD", "")
+
+    if not smtp_email or not smtp_pass:
+        return jsonify({
+            "success": False,
+            "error": "Email not configured. Add SMTP_EMAIL and SMTP_PASSWORD to your .env file."
+        })
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"]    = smtp_email
+        msg["To"]      = to_email
+        msg["Subject"] = f"RecoverAI — Restored File: {filename}"
+
+        body = (
+            f"Your file has been successfully recovered by RecoverAI.\n\n"
+            f"File: {filename}\n"
+            f"Restored to: {file_path}\n\n"
+            f"The file is attached to this email.\n\n"
+            f"— RecoverAI Forensic Recovery System"
+        )
+        msg.attach(MIMEText(body, "plain"))
+
+        # Attach the recovered file
+        with open(file_path, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+        msg.attach(part)
+
+        # Send via Gmail SMTP
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+            server.login(smtp_email, smtp_pass)
+            server.sendmail(smtp_email, to_email, msg.as_string())
+
+        return jsonify({"success": True, "sent_to": to_email})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/api/deleted/start-carve", methods=["POST"])
 def deleted_start_carve():
     """Start a background drive-carve job."""
