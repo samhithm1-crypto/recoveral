@@ -1,5 +1,7 @@
 // ── STATE ──────────────────────────────────────────────────────────────────
-const API = "http://localhost:5000/api";
+const API = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ? "http://localhost:5000/api"
+  : window.location.origin + "/api";
 let currentReport = null;
 let currentMode   = "file"; // "file" | "folder"
 
