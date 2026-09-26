@@ -317,47 +317,49 @@ def recover_log(scan_id, frag_id):
     })
 
 # ─── DEMO DATA ───────────────────────────────────────────────────────────────
+DEMO_FRAGMENTS = [
+    {
+        "id": 0, "name": "FRAG_0000.jpg", "type_name": "JPEG Image",
+        "category": "image", "offset": 0, "size": 45312, "size_kb": 44.25,
+        "integrity": {"score": 88.4, "status": "RECOVERABLE", "color": "green", "entropy": 7.61, "null_ratio": 1.2},
+        "priority": 84, "sha256": "a3f9e12b4c7d8e90", "recovered_at": "2026-09-25T10:00:00", "ext": "jpg"
+    },
+    {
+        "id": 1, "name": "FRAG_0001.pdf", "type_name": "PDF Document",
+        "category": "document", "offset": 45312, "size": 102400, "size_kb": 100.0,
+        "integrity": {"score": 92.1, "status": "RECOVERABLE", "color": "green", "entropy": 5.23, "null_ratio": 0.5},
+        "priority": 87, "sha256": "b7c2d34f1a8e09f4", "recovered_at": "2026-09-25T10:00:01", "ext": "pdf"
+    },
+    {
+        "id": 2, "name": "FRAG_0002.db", "type_name": "SQLite Database",
+        "category": "database", "offset": 147712, "size": 81920, "size_kb": 80.0,
+        "integrity": {"score": 61.3, "status": "PARTIAL", "color": "yellow", "entropy": 4.87, "null_ratio": 12.1},
+        "priority": 56, "sha256": "d9f0e23a7b4c1d82", "recovered_at": "2026-09-25T10:00:02", "ext": "db"
+    },
+    {
+        "id": 3, "name": "FRAG_0003.json", "type_name": "JSON Data",
+        "category": "data", "offset": 229632, "size": 4096, "size_kb": 4.0,
+        "integrity": {"score": 79.8, "status": "RECOVERABLE", "color": "green", "entropy": 3.91, "null_ratio": 0.0},
+        "priority": 67, "sha256": "e1c4a56f2b9d0e73", "recovered_at": "2026-09-25T10:00:03", "ext": "json"
+    },
+    {
+        "id": 4, "name": "FRAG_0004.zip", "type_name": "ZIP Archive",
+        "category": "archive", "offset": 233728, "size": 20480, "size_kb": 20.0,
+        "integrity": {"score": 32.5, "status": "CRITICAL", "color": "red", "entropy": 7.98, "null_ratio": 31.4},
+        "priority": 24, "sha256": "f2b7c89d3e0a1f45", "recovered_at": "2026-09-25T10:00:04", "ext": "zip"
+    },
+    {
+        "id": 5, "name": "FRAG_0005.mp3", "type_name": "MP3 Audio",
+        "category": "media", "offset": 254208, "size": 32768, "size_kb": 32.0,
+        "integrity": {"score": 55.0, "status": "PARTIAL", "color": "yellow", "entropy": 7.44, "null_ratio": 5.7},
+        "priority": 38, "sha256": "c3a0d17e5f2b8c91", "recovered_at": "2026-09-25T10:00:05", "ext": "mp3"
+    },
+]
+
 @app.route("/api/demo")
 def demo():
     """Return a pre-built demo scan result without needing a real upload."""
-    demo_fragments = [
-        {
-            "id": 0, "name": "FRAG_0000.jpg", "type_name": "JPEG Image",
-            "category": "image", "offset": 0, "size": 45312, "size_kb": 44.25,
-            "integrity": {"score": 88.4, "status": "RECOVERABLE", "color": "green", "entropy": 7.61, "null_ratio": 1.2},
-            "priority": 84, "sha256": "a3f9e12b4c7d8e90", "recovered_at": "2026-09-25T10:00:00", "ext": "jpg"
-        },
-        {
-            "id": 1, "name": "FRAG_0001.pdf", "type_name": "PDF Document",
-            "category": "document", "offset": 45312, "size": 102400, "size_kb": 100.0,
-            "integrity": {"score": 92.1, "status": "RECOVERABLE", "color": "green", "entropy": 5.23, "null_ratio": 0.5},
-            "priority": 87, "sha256": "b7c2d34f1a8e09f4", "recovered_at": "2026-09-25T10:00:01", "ext": "pdf"
-        },
-        {
-            "id": 2, "name": "FRAG_0002.db", "type_name": "SQLite Database",
-            "category": "database", "offset": 147712, "size": 81920, "size_kb": 80.0,
-            "integrity": {"score": 61.3, "status": "PARTIAL", "color": "yellow", "entropy": 4.87, "null_ratio": 12.1},
-            "priority": 56, "sha256": "d9f0e23a7b4c1d82", "recovered_at": "2026-09-25T10:00:02", "ext": "db"
-        },
-        {
-            "id": 3, "name": "FRAG_0003.json", "type_name": "JSON Data",
-            "category": "data", "offset": 229632, "size": 4096, "size_kb": 4.0,
-            "integrity": {"score": 79.8, "status": "RECOVERABLE", "color": "green", "entropy": 3.91, "null_ratio": 0.0},
-            "priority": 67, "sha256": "e1c4a56f2b9d0e73", "recovered_at": "2026-09-25T10:00:03", "ext": "json"
-        },
-        {
-            "id": 4, "name": "FRAG_0004.zip", "type_name": "ZIP Archive",
-            "category": "archive", "offset": 233728, "size": 20480, "size_kb": 20.0,
-            "integrity": {"score": 32.5, "status": "CRITICAL", "color": "red", "entropy": 7.98, "null_ratio": 31.4},
-            "priority": 24, "sha256": "f2b7c89d3e0a1f45", "recovered_at": "2026-09-25T10:00:04", "ext": "zip"
-        },
-        {
-            "id": 5, "name": "FRAG_0005.mp3", "type_name": "MP3 Audio",
-            "category": "media", "offset": 254208, "size": 32768, "size_kb": 32.0,
-            "integrity": {"score": 55.0, "status": "PARTIAL", "color": "yellow", "entropy": 7.44, "null_ratio": 5.7},
-            "priority": 38, "sha256": "c3a0d17e5f2b8c91", "recovered_at": "2026-09-25T10:00:05", "ext": "mp3"
-        },
-    ]
+    demo_fragments = DEMO_FRAGMENTS
 
     report = {
         "scan_id": "DEMO0001",
@@ -828,31 +830,78 @@ def ai_classify():
 
 
 # ─── AI FRAGMENT RECOMMENDATION ───────────────────────────────────────────────
-@app.route("/api/ai-recommend/<scan_id>/<int:frag_id>")
-def ai_recommend(scan_id, frag_id):
+@app.route("/api/ai-recommend/<scan_id>/<int:frag_id>", methods=["GET", "POST"])
+@app.route("/api/ai-recommend", methods=["POST"])
+def ai_recommend(scan_id=None, frag_id=None):
     """
     Return a Gemini AI recovery recommendation for a specific fragment.
+    Accepts fragment metadata directly via POST JSON, or looks it up from the report.
     """
     if not ai_engine.is_configured():
-        return jsonify({"error": "AI not configured"}), 503
+        return jsonify({"error": "AI not configured. Add your Gemini API key first."}), 503
 
-    report_path = os.path.join(REPORT_FOLDER, f"{scan_id}.json")
-    if not os.path.exists(report_path):
-        # Try demo
-        return jsonify({"error": "Scan not found"}), 404
+    body = request.get_json(silent=True) or {}
+    frag = body.get("fragment") or body.get("frag")
+    sid  = scan_id or body.get("scan_id")
+    fid  = frag_id if frag_id is not None else body.get("frag_id")
 
-    with open(report_path) as fp:
-        report = json.load(fp)
-
-    frag = next((f for f in report["fragments"] if f["id"] == frag_id), None)
+    # If frag not passed directly in POST body, look up by scan_id & frag_id
     if not frag:
-        return jsonify({"error": "Fragment not found"}), 404
+        if sid == "DEMO0001":
+            frag = next((f for f in DEMO_FRAGMENTS if f["id"] == fid), None)
+        elif sid:
+            report_path = os.path.join(REPORT_FOLDER, f"{sid}.json")
+            if os.path.exists(report_path):
+                try:
+                    with open(report_path) as fp:
+                        report = json.load(fp)
+                    frag = next((f for f in report.get("fragments", []) if f.get("id") == fid), None)
+                except Exception as e:
+                    print(f"[AI] Error reading report {sid}: {e}")
+
+    # Fallback: if frag is still missing, synthesize from available body fields or URL params
+    if not frag:
+        name = body.get("name") or request.args.get("name")
+        if name or fid is not None:
+            frag = {
+                "name": name or f"FRAG_{fid:04d}",
+                "type_name": body.get("type_name", "Data Fragment"),
+                "category": body.get("category", "data"),
+                "integrity": {
+                    "score": float(body.get("score", 70.0)),
+                    "status": body.get("status", "PARTIAL"),
+                    "entropy": float(body.get("entropy", 5.5)),
+                    "null_ratio": float(body.get("null_ratio", 2.0))
+                },
+                "size_kb": float(body.get("size_kb", 8.0))
+            }
+
+    if not frag:
+        return jsonify({"error": "Fragment data not found. Please re-run scan."}), 404
+
+    # Ensure required fields for ai_fragment_recommendation
+    if "integrity" not in frag or not isinstance(frag["integrity"], dict):
+        frag["integrity"] = {
+            "score": frag.get("score", 70.0),
+            "status": frag.get("status", "PARTIAL"),
+            "entropy": frag.get("entropy", 5.5),
+            "null_ratio": frag.get("null_ratio", 2.0)
+        }
+    for k, v in [("score", 70.0), ("status", "PARTIAL"), ("entropy", 5.5), ("null_ratio", 2.0)]:
+        if k not in frag["integrity"]:
+            frag["integrity"][k] = v
+    if "size_kb" not in frag:
+        frag["size_kb"] = round(frag.get("size", 8192) / 1024, 2)
+    if "type_name" not in frag:
+        frag["type_name"] = frag.get("name", "Unknown File")
+    if "category" not in frag:
+        frag["category"] = "unknown"
 
     text = ai_engine.ai_fragment_recommendation(frag)
     if text:
         return jsonify({"recommendation": text, "ai_powered": True})
     else:
-        return jsonify({"error": "AI recommendation failed"}), 500
+        return jsonify({"error": "AI recommendation generation failed"}), 500
 
 
 # ─── AI IMAGE ANALYSIS ────────────────────────────────────────────────────────

@@ -1484,7 +1484,20 @@ async function requestFragmentAI(scanId, fragId, btnEl) {
   panel.style.display = "flex";
 
   try {
-    const res  = await fetch(`${API}/ai-recommend/${scanId}/${fragId}`);
+    let res = await fetch(`${API}/ai-recommend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scan_id: scanId,
+        frag_id: fragId,
+        fragment: frag
+      })
+    });
+
+    if (res.status === 404 || res.status === 405) {
+      res = await fetch(`${API}/ai-recommend/${scanId}/${fragId}`);
+    }
+
     const data = await res.json();
 
     if (res.ok && data.recommendation) {
