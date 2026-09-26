@@ -397,11 +397,76 @@ def repair_png(data: bytes) -> bytes:
 
 
 def repair_pdf(data: bytes) -> bytes:
+    """
+    Repair PDF fragments to be openable across all viewers (Chrome, Edge, Adobe Acrobat).
+    Strict viewers like Microsoft Edge and Acrobat require a valid 'startxref <offset> %%EOF'
+    block pointing to either an XRef stream object or a classic xref table.
+    """
+    import re
+    if not data:
+        return make_demo_pdf()
+
+    # 1. Ensure %PDF header
     if not data.startswith(b'%PDF'):
         data = CANONICAL_HEADERS["pdf"] + data[min(9, len(data)):]
-    if b'%%EOF' not in data[-64:]:
-        data = data.rstrip(b'\x00') + b'\n%%EOF\n'
-    return data
+
+    trimmed = data.rstrip(b'\x00\r\n ')
+
+    # 2. Check if startxref already exists in the last 1024 bytes
+    last_kb = trimmed[-1024:] if len(trimmed) > 1024 else trimmed
+    sx_idx = last_kb.rfind(b'startxref')
+    if sx_idx != -1:
+        if b'%%EOF' not in last_kb[sx_idx:]:
+            return trimmed + b'\n%%EOF\n'
+        return trimmed + b'\n'
+
+    # 3. If startxref is missing:
+    # 3a. Search for an /XRef stream object (PDF 1.5+ standard)
+    xref_stream_match = list(re.finditer(rb'(\d+)\s+0\s+obj\s*<<[^>]*?/Type\s*/XRef', trimmed))
+    if xref_stream_match:
+        obj_offset = xref_stream_match[-1].start()
+        return trimmed + f'\nstartxref\n{obj_offset}\n%%EOF\n'.encode('ascii')
+
+    # 3b. Search for a classic 'xref' table
+    xref_table_match = list(re.finditer(rb'(?:\r?\n|^)xref\s*\r?\n', trimmed))
+    if xref_table_match:
+        offset = xref_table_match[-1].start()
+        if trimmed[offset:offset+1] in b'\r\n':
+            offset += 1
+        return trimmed + f'\nstartxref\n{offset}\n%%EOF\n'.encode('ascii')
+
+    # 3c. Raw fragment with loose objects: build a synthetic xref table & trailer
+    obj_matches = list(re.finditer(rb'(?:^|\r?\n)(\d+)\s+0\s+obj', trimmed))
+    if obj_matches:
+        objs = {}
+        for m in obj_matches:
+            obj_num = int(m.group(1))
+            pos = m.start()
+            while pos < len(trimmed) and trimmed[pos:pos+1] in b'\r\n':
+                pos += 1
+            objs[obj_num] = pos
+
+        max_num = max(objs.keys())
+        root_num = 1
+        catalog_match = re.search(rb'(\d+)\s+0\s+obj\s*<<[^>]*?/Type\s*/Catalog', trimmed)
+        if catalog_match:
+            root_num = int(catalog_match.group(1))
+
+        xref_offset = len(trimmed) + 1
+        lines = [b'\nxref', f'0 {max_num + 1}'.encode('ascii'), b'0000000000 65535 f ']
+        for i in range(1, max_num + 1):
+            if i in objs:
+                lines.append(f'{objs[i]:010d} 00000 n '.encode('ascii'))
+            else:
+                lines.append(b'0000000000 65535 f ')
+        lines.append(b'trailer')
+        lines.append(f'<< /Size {max_num + 1} /Root {root_num} 0 R >>'.encode('ascii'))
+        lines.append(b'startxref')
+        lines.append(f'{xref_offset}'.encode('ascii'))
+        lines.append(b'%%EOF\n')
+        return trimmed + b'\n'.join(lines)
+
+    return trimmed + b'\n%%EOF\n'
 
 
 def repair_gif(data: bytes) -> bytes:
