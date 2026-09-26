@@ -13,6 +13,9 @@
 </head>
 <body>
 
+<!-- ══ BACKGROUND ANIMATION CANVAS ══════════════════════════════════════════ -->
+<canvas id="bgCanvas"></canvas>
+
 <!-- ══ LOADING OVERLAY ════════════════════════════════════════════════════ -->
 <div id="loadingOverlay" class="loading-overlay">
   <div class="lo-content">
@@ -381,5 +384,244 @@
 </div>
 
 <script src="app.js"></script>
+
+<!-- ══ BACKGROUND ANIMATION ══════════════════════════════════════════════════ -->
+<script>
+(function () {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx    = canvas.getContext('2d');
+
+  /* ── Resize ─────────────────────────────────────────────────────────────── */
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', () => { resize(); initAll(); });
+  resize();
+
+  /* ── Config ─────────────────────────────────────────────────────────────── */
+  const CFG = {
+    particleCount : 110,
+    orbCount      : 5,
+    lineCount     : 8,
+    gridCols      : 14,
+    gridRows      : 9,
+  };
+
+  /* ── Particles ───────────────────────────────────────────────────────────── */
+  let particles = [];
+  function mkParticle() {
+    const hue = Math.random() < 0.75
+      ? Math.random() * 20          // reds  0-20
+      : 10 + Math.random() * 340;   // occasional other tones
+    return {
+      x   : Math.random() * canvas.width,
+      y   : Math.random() * canvas.height,
+      r   : 0.6 + Math.random() * 2.2,
+      vx  : (Math.random() - 0.5) * 0.35,
+      vy  : -0.1 - Math.random() * 0.4,
+      life: 0,
+      maxLife: 180 + Math.random() * 220,
+      hue,
+      sat : 80 + Math.random() * 20,
+      lit : 55 + Math.random() * 25,
+    };
+  }
+  function initParticles() {
+    particles = Array.from({ length: CFG.particleCount }, mkParticle);
+    // stagger lifetimes
+    particles.forEach(p => { p.life = Math.random() * p.maxLife; });
+  }
+
+  /* ── Glowing orbs ───────────────────────────────────────────────────────── */
+  let orbs = [];
+  function mkOrb(i) {
+    return {
+      x    : (i / CFG.orbCount) * canvas.width + Math.random() * 200 - 100,
+      y    : 100 + Math.random() * (canvas.height - 200),
+      r    : 140 + Math.random() * 180,
+      vx   : (Math.random() - 0.5) * 0.18,
+      vy   : (Math.random() - 0.5) * 0.12,
+      hue  : Math.random() < 0.8 ? 0 + Math.random() * 15 : 15 + Math.random() * 10,
+      alpha: 0.035 + Math.random() * 0.045,
+    };
+  }
+  function initOrbs() {
+    orbs = Array.from({ length: CFG.orbCount }, (_, i) => mkOrb(i));
+  }
+
+  /* ── Diagonal scan lines ─────────────────────────────────────────────────── */
+  let lines = [];
+  function mkLine() {
+    return {
+      x    : Math.random() * canvas.width * 1.5 - canvas.width * 0.25,
+      y    : -60,
+      speed: 0.4 + Math.random() * 0.7,
+      alpha: 0.03 + Math.random() * 0.06,
+      width: 1 + Math.random() * 1.5,
+    };
+  }
+  function initLines() {
+    lines = Array.from({ length: CFG.lineCount }, mkLine);
+    lines.forEach(l => { l.y = Math.random() * canvas.height; });
+  }
+
+  /* ── Dot grid ────────────────────────────────────────────────────────────── */
+  let gridDots = [];
+  let gridPulse = 0;
+  function initGrid() {
+    gridDots = [];
+    const cw = canvas.width  / CFG.gridCols;
+    const ch = canvas.height / CFG.gridRows;
+    for (let r = 0; r <= CFG.gridRows; r++) {
+      for (let c = 0; c <= CFG.gridCols; c++) {
+        gridDots.push({
+          x     : c * cw,
+          y     : r * ch,
+          phase : Math.random() * Math.PI * 2,
+          speed : 0.004 + Math.random() * 0.006,
+        });
+      }
+    }
+  }
+
+  /* ── Init all ────────────────────────────────────────────────────────────── */
+  function initAll() {
+    initParticles();
+    initOrbs();
+    initLines();
+    initGrid();
+  }
+  initAll();
+
+  /* ── Draw ────────────────────────────────────────────────────────────────── */
+  let frame = 0;
+
+  function drawOrbs() {
+    orbs.forEach(o => {
+      /* drift */
+      o.x += o.vx;
+      o.y += o.vy;
+      if (o.x < -o.r)               o.x = canvas.width  + o.r;
+      if (o.x > canvas.width  + o.r) o.x = -o.r;
+      if (o.y < -o.r)               o.y = canvas.height + o.r;
+      if (o.y > canvas.height + o.r) o.y = -o.r;
+
+      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+      g.addColorStop(0,   `hsla(${o.hue},90%,45%,${o.alpha})`);
+      g.addColorStop(0.5, `hsla(${o.hue},80%,30%,${o.alpha * 0.5})`);
+      g.addColorStop(1,   'transparent');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawGrid() {
+    gridPulse += 0.008;
+    gridDots.forEach(d => {
+      d.phase += d.speed;
+      const pulse = (Math.sin(d.phase + gridPulse) + 1) / 2;
+      const alpha = 0.06 + pulse * 0.14;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 1.1, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,50,50,${alpha})`;
+      ctx.fill();
+    });
+  }
+
+  function drawLines() {
+    lines.forEach(l => {
+      l.y += l.speed;
+      if (l.y > canvas.height + 60) {
+        l.y    = -60;
+        l.x    = Math.random() * canvas.width * 1.5 - canvas.width * 0.25;
+        l.speed= 0.4 + Math.random() * 0.7;
+      }
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,30,30,${l.alpha})`;
+      ctx.lineWidth   = l.width;
+      ctx.beginPath();
+      ctx.moveTo(l.x - 400, l.y - 400);
+      ctx.lineTo(l.x + 400, l.y + 400);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  function drawParticles() {
+    particles.forEach((p, idx) => {
+      p.life += 1;
+      p.x    += p.vx + Math.sin(frame * 0.01 + idx) * 0.08;
+      p.y    += p.vy;
+
+      /* respawn when expired or off-screen */
+      if (p.life >= p.maxLife || p.y < -10) {
+        particles[idx] = mkParticle();
+        particles[idx].y = canvas.height + 5;
+        return;
+      }
+
+      const t = p.life / p.maxLife;
+      const alpha = t < 0.15
+        ? t / 0.15
+        : t > 0.75
+          ? (1 - t) / 0.25
+          : 1;
+
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.75;
+      /* soft glow */
+      ctx.shadowBlur  = 8;
+      ctx.shadowColor = `hsl(${p.hue},${p.sat}%,${p.lit}%)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsl(${p.hue},${p.sat}%,${p.lit}%)`;
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  /* occasional horizontal pulse sweep */
+  let sweepY    = -20;
+  let sweepAlpha= 0;
+  let sweepTimer= 200;
+  function drawSweep() {
+    sweepTimer--;
+    if (sweepTimer <= 0) {
+      sweepTimer = 300 + Math.random() * 400;
+      sweepY     = canvas.height + 10;
+      sweepAlpha = 0.06 + Math.random() * 0.06;
+    }
+    if (sweepY > -20) {
+      sweepY -= 2.2;
+      ctx.save();
+      const g = ctx.createLinearGradient(0, sweepY - 60, 0, sweepY + 60);
+      g.addColorStop(0,   'transparent');
+      g.addColorStop(0.5, `rgba(255,40,40,${sweepAlpha})`);
+      g.addColorStop(1,   'transparent');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, sweepY - 60, canvas.width, 120);
+      ctx.restore();
+    }
+  }
+
+  /* ── Main loop ───────────────────────────────────────────────────────────── */
+  function loop() {
+    frame++;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawOrbs();
+    drawGrid();
+    drawLines();
+    drawParticles();
+    drawSweep();
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
 </body>
 </html>
